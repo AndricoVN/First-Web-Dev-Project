@@ -1,4 +1,3 @@
-/* phongcach.css */
 body {
     background-color: #121212;
     color: #ffffff;
@@ -18,14 +17,21 @@ h1 {
     margin-bottom: 20px;
 }
 
-/* Khung chứa ảnh và canvas */
+/* Khung chứa ảnh ngoài để giới hạn hiển thị */
+#imageWrapper {
+    width: 66.67%; /* Giới hạn chiều rộng khung */
+    margin: 10px auto;
+    overflow: hidden; /* Ẩn phần ảnh vượt ra ngoài */
+    position: relative;
+}
+
+/* Khung chứa ảnh và canvas, thêm border trắng */
 #imageContainer {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 66.67%; /* 2/3 chiều rộng màn hình */
-    margin: 10px auto;
+    border: 2px solid white;
 }
 
 #uploadedImage {
@@ -54,10 +60,17 @@ button {
     font-weight: bold;
     margin-top: 10px;
 }
+
 .button-container {
     display: grid;
     grid-template-columns: repeat(2, auto);
     gap: 10px;
     justify-content: center;
     margin-top: 10px;
+}
+
+/* Thêm style cho hướng dẫn sử dụng */
+.instructions {
+    font-size: 1rem;
+    margin-bottom: 10px;
 }
