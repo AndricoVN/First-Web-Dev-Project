@@ -1,21 +1,63 @@
+/* phongcach.css */
 body {
-    background: linear-gradient(135deg, #363636, #5f4037);
+    background-color: #121212;
+    color: #ffffff;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    display: grid;
+    justify-content: center; /* Căn giữa container */
+    align-items: center;
 }
 
 h1 {
-    font-family: 'Arial', sans-serif;
-    font-size: 2.5rem;
+    font-size: 2rem;
+    margin-bottom: 20px;
 }
 
+/* Khung chứa ảnh và canvas */
+#imageContainer {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 66.67%; /* 2/3 chiều rộng màn hình */
+    margin: 10px auto;
+}
+
+#uploadedImage {
+    width: 100%;
+    height: auto;
+}
+
+/* Canvas vẽ bounding box, cho phép nhận sự kiện chuột */
+#drawingCanvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: auto;
+}
+
+/* Style cho nút và thông báo */
 button {
-    font-size: 1.2rem;
+    font-size: 1rem;
     padding: 10px 20px;
     border-radius: 8px;
+    margin: 10px 5px;
 }
 
-.highlight_text {
-    color: #a446cf !important;
+.message {
+    font-size: 1rem;
     font-weight: bold;
-    font-size: 1.5rem;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    margin-top: 10px;
+}
+.button-container {
+    display: grid;
+    grid-template-columns: repeat(2, auto);
+    gap: 10px;
+    justify-content: center;
+    margin-top: 10px;
 }
