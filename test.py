@@ -18,43 +18,79 @@ CORS(app)
 def home():
     return render_template("test.html")
 
+@app.route("/api/get-unlabeled-image", methods=["GET"])
+def get_unlabeled_image():
+    try:
+        # Lấy danh sách ảnh từ bucket "images"
+        image_bucket = supabase.storage.from_("images")
+        images = image_bucket.list("")
+        print("Images:", images)  # In ra danh sách ảnh
+
+        # Lấy danh sách label từ bucket "labels"
+        label_bucket = supabase.storage.from_("labels")
+        labels = label_bucket.list("")
+        print("Labels:", labels)  # In ra danh sách labels
+
+        # Tạo set tên file (không phần mở rộng) của các label đã có
+        labeled_set = set()
+        for label in labels:
+            # Loại trừ file placeholder nếu có
+            if label["name"].startswith("."):
+                continue
+            labeled_set.add(os.path.splitext(label["name"])[0])
+
+        # Tìm ảnh mà chưa có label (dựa theo tên file), bỏ qua file bắt đầu bằng dấu chấm
+        for image in images:
+            if image["name"].startswith("."):
+                continue
+            image_basename = os.path.splitext(image["name"])[0]
+            if image_basename not in labeled_set:
+                image_url = f"{SUPABASE_URL}/storage/v1/object/public/images/{image['name']}"
+                return jsonify({
+                    "image_url": image_url,
+                    "filename": image["name"]
+                })
+        return jsonify({"error": "Hết ảnh rồi"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/upload", methods=["POST"])
 def upload():
     try:
-        # Lấy file ảnh và dữ liệu label (YOLOv8 format text) từ request
-        image_file = request.files.get("image")
-        labels_txt = request.form.get("labels")  # Dữ liệu label dưới dạng txt
-
-        if not image_file:
-            return jsonify({"error": "No image file provided"}), 400
+        # Lấy dữ liệu label dưới dạng txt
+        labels_txt = request.form.get("labels")
         if not labels_txt:
             return jsonify({"error": "No label data provided"}), 400
 
-        # Đọc dữ liệu ảnh
-        image_data = image_file.read()
-        image_filename = image_file.filename
+        # Nếu có file ảnh được upload thì xử lý như cũ, nếu không lấy filename từ form
+        image_file = request.files.get("image")
+        if image_file:
+            image_data = image_file.read()
+            image_filename = image_file.filename
 
-        # Upload ảnh lên Supabase Storage (bucket "images")
-        image_bucket = supabase.storage.from_("images")
-        try:
-            image_bucket.remove([image_filename])
-        except Exception:
-            # Nếu file không tồn tại, bỏ qua
-            pass
+            image_bucket = supabase.storage.from_("images")
+            try:
+                image_bucket.remove([image_filename])
+            except Exception:
+                pass
 
-        image_upload_response = image_bucket.upload(image_filename, image_data, {
-            "content-type": image_file.content_type
-        })
-        if hasattr(image_upload_response, "error") and image_upload_response.error is not None:
-            return jsonify({"error": image_upload_response.error.message}), 400
+            image_upload_response = image_bucket.upload(image_filename, image_data, {
+                "content-type": image_file.content_type
+            })
+            if hasattr(image_upload_response, "error") and image_upload_response.error is not None:
+                return jsonify({"error": image_upload_response.error.message}), 400
 
-        image_url = f"{SUPABASE_URL}/storage/v1/object/public/images/{image_filename}"
+            image_url = f"{SUPABASE_URL}/storage/v1/object/public/images/{image_filename}"
+        else:
+            image_filename = request.form.get("filename")
+            if not image_filename:
+                return jsonify({"error": "No image file provided"}), 400
+            image_url = f"{SUPABASE_URL}/storage/v1/object/public/images/{image_filename}"
 
-        # Tạo tên file label (dạng txt) dựa trên tên file ảnh
+        # Tạo file label dựa trên tên file ảnh
         label_filename = os.path.splitext(image_filename)[0] + ".txt"
         label_content = labels_txt
 
-        # Upload file label lên Supabase Storage (bucket "labels")
         label_bucket = supabase.storage.from_("labels")
         try:
             label_bucket.remove([label_filename])

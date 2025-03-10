@@ -1,5 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
-    const imageInput = document.getElementById("imageInput");
+    const loadImageBtn = document.getElementById("loadImageBtn");
     const imageElement = document.getElementById("uploadedImage");
     const canvas = document.getElementById("drawingCanvas");
     const uploadBtn = document.getElementById("uploadBtn");
@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", function () {
     let isDrawing = false;
     let startX = 0, startY = 0;
     let currentBox = null;
-    let imageFile = null;
+    let currentImageFilename = ""; // Lưu tên file ảnh lấy từ Supabase
     let imageLoaded = false;
     let currentScale = 1;  // Tỉ lệ zoom hiện tại
     let dragOffsetX = 0, dragOffsetY = 0; // Dịch chuyển ảnh
@@ -32,17 +32,23 @@ document.addEventListener("DOMContentLoaded", function () {
         message.style.color = color;
     }
 
-    // Xử lý khi chọn ảnh
-    imageInput.addEventListener("change", function () {
-        const file = imageInput.files[0];
-        if (!file) return;
-        imageFile = file;
-
-        const reader = new FileReader();
-        reader.onload = function (event) {
-            imageElement.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
+    // Xử lý khi nhấn nút tải ảnh từ Supabase
+    loadImageBtn.addEventListener("click", function () {
+        showMessage("Đang tải ảnh...", "gray");
+        fetch("/api/get-unlabeled-image")
+        .then(response => response.json())
+        .then(data => {
+            if(data.error) {
+                showMessage("Lỗi: " + data.error, "red");
+            } else {
+                imageElement.src = data.image_url;
+                currentImageFilename = data.filename;
+            }
+        })
+        .catch(error => {
+            console.error("Lỗi:", error);
+            showMessage("Có lỗi khi tải ảnh", "red");
+        });
     });
 
     // Khi ảnh đã load, cập nhật kích thước canvas
@@ -139,9 +145,9 @@ document.addEventListener("DOMContentLoaded", function () {
         showMessage("Đã xóa box, vẽ lại đi!", "yellow");
     });
 
-    // Upload ảnh và label
+    // Upload label (và nếu cần, image thông qua filename)
     uploadBtn.addEventListener("click", function () {
-        if (!imageFile) {
+        if (!imageElement.src) {
             showMessage("Chưa chọn ảnh!", "red");
             return;
         }
@@ -160,8 +166,8 @@ document.addEventListener("DOMContentLoaded", function () {
         const labelText = `0 ${x_center.toFixed(6)} ${y_center.toFixed(6)} ${width_norm.toFixed(6)} ${height_norm.toFixed(6)}`;
 
         const formData = new FormData();
-        formData.append("image", imageFile);
         formData.append("labels", labelText);
+        formData.append("filename", currentImageFilename);
 
         fetch("/api/upload", {
             method: "POST",
