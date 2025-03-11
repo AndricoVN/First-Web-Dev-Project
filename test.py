@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import os
-import json
 from supabase import create_client, Client
 
 # Cấu hình Supabase (nên chuyển key sang biến môi trường trong production)
@@ -14,6 +13,24 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 app = Flask(__name__)
 CORS(app)
 
+def list_all_files(bucket, path):
+    """
+    Hàm này load toàn bộ file từ bucket theo từng batch (mỗi batch 100 file).
+    Dùng cho các bucket có số lượng file không quá lớn.
+    """
+    all_files = []
+    offset = 0
+    limit = 100
+    while True:
+        batch = bucket.list(path, {"limit": limit, "offset": offset})
+        if not batch:
+            break
+        all_files.extend(batch)
+        if len(batch) < limit:
+            break
+        offset += limit
+    return all_files
+
 @app.route("/")
 def home():
     return render_template("test.html")
@@ -21,35 +38,37 @@ def home():
 @app.route("/api/get-unlabeled-image", methods=["GET"])
 def get_unlabeled_image():
     try:
-        # Lấy danh sách ảnh từ bucket "images"
-        image_bucket = supabase.storage.from_("images")
-        images = image_bucket.list("")
-        print("Images:", images)  # In ra danh sách ảnh
-
-        # Lấy danh sách label từ bucket "labels"
+        # Lấy danh sách label từ bucket "labels" (load toàn bộ vì số lượng label thường ít)
         label_bucket = supabase.storage.from_("labels")
-        labels = label_bucket.list("")
-        print("Labels:", labels)  # In ra danh sách labels
-
-        # Tạo set tên file (không phần mở rộng) của các label đã có
+        labels = list_all_files(label_bucket, "")
         labeled_set = set()
         for label in labels:
-            # Loại trừ file placeholder nếu có
             if label["name"].startswith("."):
                 continue
             labeled_set.add(os.path.splitext(label["name"])[0])
 
-        # Tìm ảnh mà chưa có label (dựa theo tên file), bỏ qua file bắt đầu bằng dấu chấm
-        for image in images:
-            if image["name"].startswith("."):
-                continue
-            image_basename = os.path.splitext(image["name"])[0]
-            if image_basename not in labeled_set:
-                image_url = f"{SUPABASE_URL}/storage/v1/object/public/images/{image['name']}"
-                return jsonify({
-                    "image_url": image_url,
-                    "filename": image["name"]
-                })
+        # Duyệt các ảnh theo từng batch để trả về ngay khi tìm được ảnh chưa có label
+        image_bucket = supabase.storage.from_("images")
+        offset = 0
+        limit = 100
+        while True:
+            batch = image_bucket.list("", {"limit": limit, "offset": offset})
+            if not batch:
+                break
+            for image in batch:
+                if image["name"].startswith("."):
+                    continue
+                image_basename = os.path.splitext(image["name"])[0]
+                if image_basename not in labeled_set:
+                    image_url = f"{SUPABASE_URL}/storage/v1/object/public/images/{image['name']}"
+                    return jsonify({
+                        "image_url": image_url,
+                        "filename": image["name"]
+                    })
+            if len(batch) < limit:
+                break
+            offset += limit
+
         return jsonify({"error": "Hết ảnh rồi"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
