@@ -13,12 +13,20 @@ document.addEventListener("DOMContentLoaded", function () {
     let currentBox = null;
     let currentImageFilename = "";
     let imageLoaded = false;
+    let currentScale = 1;
+    let dragOffsetX = 0, dragOffsetY = 0;
+    let isDraggingImage = false;
+    let dragStartX = 0, dragStartY = 0;
 
     const ctx = canvas.getContext("2d");
 
     function showMessage(text, color) {
         message.innerText = text;
         message.style.color = color;
+    }
+
+    function updateTransform() {
+        imageContainer.style.transform = `translate(${dragOffsetX}px, ${dragOffsetY}px) scale(${currentScale})`;
     }
 
     function loadNewImage() {
@@ -47,13 +55,17 @@ document.addEventListener("DOMContentLoaded", function () {
         boxes = [];
         redraw();
         imageLoaded = true;
+        currentScale = 1;
+        dragOffsetX = 0;
+        dragOffsetY = 0;
+        updateTransform();
     });
 
     function getAdjustedCoordinates(e) {
         const rect = canvas.getBoundingClientRect();
         return {
-            x: (e.clientX - rect.left),
-            y: (e.clientY - rect.top)
+            x: (e.clientX - rect.left) / currentScale,
+            y: (e.clientY - rect.top) / currentScale
         };
     }
 
@@ -148,5 +160,41 @@ document.addEventListener("DOMContentLoaded", function () {
             console.error("Lỗi:", error);
             showMessage("Có lỗi rồi, báo thằng Huy đi!", "red");
         });
+    });
+
+    imageContainer.addEventListener("wheel", function(e) {
+        if (!imageLoaded || !e.ctrlKey) return;
+        e.preventDefault();
+        let zoomAmount = -e.deltaY * 0.001;
+        currentScale = Math.min(Math.max(currentScale + zoomAmount, 0.1), 5);
+        updateTransform();
+    });
+
+    imageContainer.addEventListener("mousedown", function(e) {
+        if (e.button === 2 && !e.ctrlKey) {
+            isDraggingImage = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            e.preventDefault();
+        }
+    });
+
+    imageContainer.addEventListener("mousemove", function(e) {
+        if (isDraggingImage) {
+            dragOffsetX += e.clientX - dragStartX;
+            dragOffsetY += e.clientY - dragStartY;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            updateTransform();
+            e.preventDefault();
+        }
+    });
+
+    imageContainer.addEventListener("mouseup", function(e) {
+        if (e.button === 2) isDraggingImage = false;
+    });
+
+    imageContainer.addEventListener("mouseleave", function() {
+        isDraggingImage = false;
     });
 });
